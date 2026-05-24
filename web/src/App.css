@@ -76,11 +76,12 @@
   content: "";
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.4); /* dark overlay */
+  background: rgba(0, 0, 0, 0.4);
+  /* dark overlay */
   z-index: 1;
 }
 
-.login-art > * {
+.login-art>* {
   position: relative;
   z-index: 2;
 }
@@ -88,7 +89,7 @@
 .app-shell.dark {
   --bg: #111827;
   --panel: #172033;
-  --panel-soft: #111a2a;
+  --panel-soft: #00000020;
   --border: #2a3952;
   --border-strong: #3b506d;
   --text: #edf3fa;
@@ -243,6 +244,7 @@ button {
 .config-card {
   display: grid;
   gap: 16px;
+  height: 45vh;
 }
 
 label {
@@ -502,6 +504,7 @@ kbd {
   font-size: 13px;
 }
 
+
 .search-result {
   display: flex;
   align-items: center;
@@ -750,6 +753,7 @@ kbd {
 .card {
   min-width: 0;
   margin: 1vh;
+  
 }
 
 .stat-card {
@@ -990,7 +994,6 @@ thead th {
 }
 
 td {
-  color: var(--text);
   font-size: 14px;
 }
 
@@ -1015,21 +1018,19 @@ tbody tr:hover {
   padding: 7px;
 }
 
-.status.pass,
-.status.active {
+.status.active,
+.status.generated {
   color: #00865a;
   background: var(--green-soft);
   border: 1px solid rgba(10, 175, 119, 0.25);
 }
 
-.status.fail,
 .status.inactive {
   color: #c81e28;
   background: var(--red-soft);
   border: 1px solid rgba(229, 72, 77, 0.24);
 }
 
-.status.pending,
 .status.on-hold {
   color: var(--amber);
   background: var(--amber-soft);
@@ -1229,7 +1230,9 @@ tbody tr:hover {
   grid-template-columns: repeat(3, 1fr);
   gap: 10px;
 }
-
+.batch-config{
+  height:60vh;
+}
 .connection-pill {
   color: var(--muted);
   background: var(--panel-soft);
@@ -1330,157 +1333,170 @@ tbody tr:hover {
   color: var(--green);
 }
 
-.certificate {
+.certificate.pharcos-coa {
   background: #fff;
-  color: #152033;
+  color: #111;
   border: 1px solid #cbd7e6;
   box-shadow: var(--shadow);
-  padding: 34px 42px;
+  padding: 40px 50px;
   min-height: 820px;
   margin: auto;
   width: 60vw;
+  font-family: 'Times New Roman', Times, serif;
+  font-size: 13px;
+  line-height: 1.4;
+
 }
 
-.certificate header {
+.pharcos-coa .coa-header {
   display: flex;
   justify-content: space-between;
-  gap: 20px;
-  padding-bottom: 20px;
-  border-bottom: 3px solid #152033;
+  align-items: flex-start;
+  margin-bottom: 20px;
 }
 
-.certificate header>div:last-child {
-  display: grid;
-  gap: 4px;
+.pharcos-coa .coa-company {
   text-align: right;
-  color: #445875;
-  font-size: 13px;
 }
 
-.certificate header strong {
-  color: #0077bd;
-  text-transform: uppercase;
-}
-
-.certificate-brand strong {
-  display: block;
-  color: #152033 !important;
+.pharcos-coa .coa-company strong {
   font-size: 22px;
+  display: block;
+  letter-spacing: 0.05em;
+  color: #111;
 }
 
-.certificate h2 {
-  margin: 28px 0 20px;
-  text-align: center;
-  font-size: 30px;
+.pharcos-coa .coa-company span {
+  font-size: 12px;
+  color: #555;
   letter-spacing: 0.15em;
   text-transform: uppercase;
 }
 
-.certificate-meta {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 34px;
-  padding: 22px 0;
-  border-top: 1px solid #d9e2ee;
-  border-bottom: 1px solid #d9e2ee;
-}
-
-.certificate-meta span {
-  display: block;
-  color: #64748b;
-  font-size: 12px;
-  letter-spacing: 0.12em;
-  margin-bottom: 8px;
+.pharcos-coa h1 {
+  text-align: center;
+  font-size: 16px;
+  font-weight: bold;
   text-transform: uppercase;
+  letter-spacing: 0.12em;
+  margin: 10px 0 20px;
+  text-decoration: underline;
+  color: #111;
 }
 
-.certificate-meta p {
-  margin: 5px 0;
-  line-height: 1.5;
+/* ── Product Info Grid ── */
+.pharcos-coa .info-grid {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 20px;
+
 }
 
-.print-table {
-  margin-top: 20px;
+.pharcos-coa .info-grid td {
+  border: 1px solid #444;
+  padding: 5px 10px;
+  font-size: 12.5px;
 }
 
-.print-table table {
-  min-width: 0;
+.pharcos-coa .info-grid .label {
+  font-weight: bold;
+  width: 22%;
+  background: #f9f9f9;
 }
 
-.print-table th,
-.print-table td {
-  padding: 10px 12px;
-  color: #152033;
-  border-bottom-color: #d9e2ee;
+.pharcos-coa .info-grid .product-name {
+  font-weight: bold;
+  font-size: 13px;
+  background: #f5f5f5;
+  padding: 7px 10px;
 }
 
-.print-table th {
-  background: #f7f9fc;
+/* ── Test Results Table ── */
+.pharcos-coa .test-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 18px 0;
+  color: #111;
+
 }
 
-.certificate-note {
-  margin: 26px 0;
-  padding-left: 14px;
-  border-left: 3px solid #9eb3cc;
-  color: #445875;
-  font-style: italic;
-  line-height: 1.65;
+.pharcos-coa .test-table th,
+.pharcos-coa .test-table td {
+  border: 1px solid #444;
+  padding: 6px 10px;
+  font-size: 12.5px;
+  vertical-align: top;
 }
 
-.certificate footer {
-  display: grid;
-  grid-template-columns: 90px 1fr 1fr;
-  gap: 36px;
-  align-items: end;
-  margin-top: 130px;
-  border-top: 1px solid #d9e2ee;
-  padding-top: 28px;
+.pharcos-coa .test-table th {
+  font-weight: bold;
+  text-align: center;
+  background: #f9f9f9;
+  color: #111;
 }
 
-.qr-box {
-  width: 72px;
-  height: 72px;
-  border: 2px solid #152033;
-  display: grid;
-  place-items: center;
-  color: #152033;
-  font-weight: 900;
-}
-
-.signature-line {
+.pharcos-coa .test-table td:last-child {
   text-align: center;
 }
 
-.signature-line span {
+/* ── Certification & Footer ── */
+.pharcos-coa .cert-statement {
+  margin: 18px 0 10px;
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.pharcos-coa .storage {
+  margin: 8px 0 20px;
+  font-size: 12.5px;
+}
+
+.pharcos-coa .digital-note{
+  text-align: center;
+  margin: 12px;
+  font-size: 11.5px;
+  line-height: 1.6;
+  border: 0.5px solid #111;
+}
+.digital-note table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.digital-note th,
+.digital-note td {
+  color: #111;
+  border: 0.5px solid #111;
+  padding: 6px 10px;
+  font-size: 11px;
+  text-align: center;
+}
+
+.sign-cell{
+  height: 60px;
+}
+.pharcos-coa .doc-ref {
+  text-align: right;
+  font-size: 11px;
+  color: #555;
+  margin: 16px 0 10px;
+}
+
+.pharcos-coa .coa-footer {
+  text-align: center;
+  border-top: 1px solid #999;
+  padding-top: 14px;
+  margin-top: 20px;
+  font-size: 11px;
+  color: #444;
+}
+
+.pharcos-coa .coa-footer strong {
   display: block;
-  min-height: 32px;
-  color: #44658f;
-  font-style: italic;
-  border-bottom: 1px solid #9eb3cc;
-}
-
-.signature-line.stamp span {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 7px 14px;
-  border: 1px solid #8dcaf0;
-  color: #0077bd;
-  font-style: normal;
-  font-size: 12px;
-  font-weight: 850;
-  text-transform: uppercase;
-  transform: rotate(-2deg);
-}
-
-.signature-line strong,
-.signature-line small {
-  display: block;
-  margin-top: 6px;
-}
-
-.signature-line small {
-  color: #64748b;
+  font-size: 14px;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+  color: #111;
 }
 
 .utility-grid {
@@ -1568,6 +1584,75 @@ tbody tr:hover {
   }
 }
 
+/* ── COA Confirm Dialog ── */
+.coa-confirm-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 28px 32px;
+  max-width: 420px;
+  width: 92vw;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18);
+  animation: confirm-pop 0.25s cubic-bezier(0.21, 1.02, 0.73, 1) forwards;
+}
+
+.coa-confirm-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+  display: grid;
+  place-items: center;
+  font-size: 20px;
+  margin: 0 auto 14px;
+}
+
+.coa-confirm-card h3 {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 4px;
+}
+
+.coa-confirm-sub {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0 0 18px;
+}
+
+.coa-confirm-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 16px;
+  text-align: left;
+  padding: 14px 16px;
+  background: var(--panel-soft);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 20px;
+  font-size: 13px;
+}
+
+.coa-confirm-grid span {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.coa-confirm-grid strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.coa-confirm-grid .all-filled {
+  color: #10b981;
+}
+
+.coa-confirm-grid .partial-filled {
+  color: #f59e0b;
+}
+
 @media (max-width: 760px) {
 
   .login-panel,
@@ -1619,8 +1704,6 @@ tbody tr:hover {
   .stat-grid,
   .form-grid,
   .utility-grid,
-  .certificate-meta,
-  .certificate footer,
   .modal-grid {
     grid-template-columns: 1fr;
   }
@@ -1635,27 +1718,23 @@ tbody tr:hover {
     margin-left: 0;
   }
 
-  .certificate {
+  .certificate.pharcos-coa {
     padding: 24px 18px;
     min-height: auto;
+    width: 100%;
   }
 
-  .certificate header {
-    flex-direction: column;
+  .pharcos-coa .info-grid td {
+    font-size: 11px;
+    padding: 4px 6px;
   }
 
-  .certificate header>div:last-child {
-    text-align: left;
-  }
-
-  .certificate h2 {
-    font-size: 22px;
-  }
-
-  .certificate footer {
-    margin-top: 40px;
+  .pharcos-coa h1 {
+    font-size: 14px;
   }
 }
+
+
 
 /* ── Toast Notifications ── */
 .toast-container {

@@ -4,24 +4,41 @@ import './App.css'
 
 const navItems = ['Dashboard', 'Clients', 'Products', 'Generated COAs', 'Lab Operators']
 
-function statusFor(specification, rawResult) {
-  const result = Number.parseFloat(rawResult)
-  if (!rawResult || Number.isNaN(result)) return 'Pending'
+function toDateInputValue(date) {
+  return date.toISOString().slice(0, 10)
+}
 
-  if (specification.includes(' - ')) {
-    const [min, max] = specification.split(' - ').map((value) => Number.parseFloat(value))
-    return result >= min && result <= max ? 'Pass' : 'Fail'
+function addYearsToDateInput(value, years) {
+  const date = value ? new Date(`${value}T00:00:00`) : new Date()
+  date.setFullYear(date.getFullYear() + years)
+  return toDateInputValue(date)
+}
+
+function formatDate(value) {
+  if (!value) return '\u2014'
+  return new Date(value).toLocaleDateString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  })
+}
+
+function formatMonthYear(value) {
+  if (!value) return '\u2014'
+  return new Date(value).toLocaleDateString('en-IN', {
+    month: 'short',
+    year: 'numeric',
+  }).toUpperCase()
+}
+
+function createSpecRow(row = {}) {
+  return {
+    localId: row.localId || crypto.randomUUID(),
+    parameter: row.parameter || '',
+    specification: row.specification || '',
+    method: row.method || '',
+    unit: row.unit || '',
   }
-
-  if (specification.includes('>=')) {
-    return result >= Number.parseFloat(specification.replace('>=', '')) ? 'Pass' : 'Fail'
-  }
-
-  if (specification.includes('<=')) {
-    return result <= Number.parseFloat(specification.replace('<=', '')) ? 'Pass' : 'Fail'
-  }
-
-  return 'Pass'
 }
 
 function initials(value = '') {
@@ -128,6 +145,8 @@ function App() {
 
   useEffect(() => {
     if (session?.token) loadData(session.token)
+    // Initial session restore only; subsequent refreshes are triggered after mutations.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   const [role, setRole] = useState('ADMIN')
   const [page, setPage] = useState('Dashboard')
@@ -271,6 +290,14 @@ function App() {
     setPage('Generated COAs')
   }
 
+  async function deleteCoa(id) {
+    const ok = await askConfirm('This will permanently delete this COA record.')
+    if (!ok) return
+    await api(`${API_ENDPOINTS.coa}/${id}`, { method: 'DELETE' })
+    toast('COA deleted')
+    await loadData()
+  }
+
   if (!session) {
     return <LoginPage role={role} setRole={setRole} onLogin={handleLogin} />
   }
@@ -307,7 +334,7 @@ function App() {
                 {(page === 'Products' || page === 'Specification Templates') && (
                   <TemplatePage products={products} loading={loading} onSave={saveProduct} onDelete={deleteProduct} search={globalSearch} />
                 )}
-                {page === 'Generated COAs' && <CoaArchive coas={coas} search={globalSearch} />}
+                {page === 'Generated COAs' && <CoaArchive coas={coas} search={globalSearch} onDelete={deleteCoa} />}
                 {page === 'Dashboard' && (
                   <AdminDashboard stats={stats} coas={coas} loading={loading} />
                 )}
@@ -631,13 +658,14 @@ function RecentCoaTable({ coas }) {
         <EmptyState title="No COAs generated yet" description="Generated certificates will appear here." />
       ) : (
         <DataTable
-          columns={['COA ID', 'Product', 'Client', 'Batch', 'Status', 'Operator']}
+          columns={['COA ID', 'Product', 'Client', 'Batch', 'Date of Issue', 'Status', 'Operator']}
           rows={coas.slice(-5).reverse().map((coa) => [
             coa.coaNumber,
             coa.productName,
             coa.clientName,
             coa.batchNo,
-            <span className="status pass">{coa.status}</span>,
+            new Date(coa.createdAt).toLocaleDateString(),
+            <span className={`status ${(coa.status || 'generated').toLowerCase()}`}>{coa.status}</span>,
             coa.testedBy,
           ])}
         />
@@ -793,7 +821,11 @@ function TemplatePage({ products, loading, onSave, onDelete, search }) {
   function selectProduct(value) {
     const product = products.find((item) => item._id === value)
     setSelectedId(value)
-    setDraft(product ? { ...product } : emptyProduct())
+    setDraft(
+      product
+        ? { ...product, specifications: (product.specifications || []).map((row) => createSpecRow(row)) }
+        : emptyProduct(),
+    )
     setIsModalOpen(true)
   }
 
@@ -809,16 +841,21 @@ function TemplatePage({ products, loading, onSave, onDelete, search }) {
   function addSpec() {
     setDraft((current) => ({
       ...current,
-      specifications: [
-        ...current.specifications,
-        { parameter: '', specification: '', method: '', unit: '' },
-      ],
+      specifications: [...current.specifications, createSpecRow()],
     }))
   }
 
   async function submit(event) {
     event.preventDefault()
-    await onSave(draft)
+    await onSave({
+      ...draft,
+      specifications: draft.specifications.map((row) => ({
+        parameter: row.parameter,
+        specification: row.specification,
+        method: row.method,
+        unit: row.unit,
+      })),
+    })
     setSelectedId('')
     setDraft(emptyProduct())
     setIsModalOpen(false)
@@ -854,10 +891,12 @@ function TemplatePage({ products, loading, onSave, onDelete, search }) {
           <EmptyState title="No product templates yet" description="Use New Template to open the modal." />
         ) : (
           <DataTable
-            columns={['Product', 'Code', 'Grade', 'Version', 'Parameters', 'Actions']}
+            columns={['Product', 'Code', 'Trade Name', 'Specification No.', 'Grade', 'Version', 'Parameters', 'Actions']}
             rows={filtered.map((product) => [
               product.productName,
               product.productCode,
+              product.tradeName,
+              product.specificationNo,
               product.grade,
               `v${product.version}`,
               product.specifications?.length || 0,
@@ -882,7 +921,7 @@ function TemplatePage({ products, loading, onSave, onDelete, search }) {
         >
           <form className="modal-form" onSubmit={submit}>
             <div className="modal-grid">
-              {['productName', 'productCode', 'grade', 'description'].map((field) => (
+              {['productName', 'productCode', 'tradeName', 'grade', 'specificationNo', 'description'].map((field) => (
                 <label key={field}>
                   {field.replace(/([A-Z])/g, ' $1')}
                   <input
@@ -916,7 +955,7 @@ function TemplatePage({ products, loading, onSave, onDelete, search }) {
                   </thead>
                   <tbody>
                     {draft.specifications.map((row, index) => (
-                      <tr key={`${index}-${row.parameter}`}>
+                      <tr key={row.localId}>
                         <td>{index + 1}</td>
                         {['parameter', 'specification', 'method', 'unit'].map((key) => (
                           <td key={key}>
@@ -951,19 +990,28 @@ function emptyProduct() {
   return {
     productName: '',
     productCode: '',
+    tradeName: '',
     grade: '',
+    specificationNo: '',
     description: '',
     specifications: [],
   }
 }
 
 function LabOperatorDashboard({ clients, products, onCreateCoa }) {
+  const today = toDateInputValue(new Date())
   const [clientId, setClientId] = useState('')
   const [productId, setProductId] = useState('')
   const [batchNo, setBatchNo] = useState('')
-  const [manufacturingDate, setManufacturingDate] = useState('')
-  const [expiryDate, setExpiryDate] = useState('')
+  const [manufacturingDate, setManufacturingDate] = useState(today)
+  const [expiryDate, setExpiryDate] = useState(addYearsToDateInput(today, 2))
+  const [batchReleaseDate, setBatchReleaseDate] = useState(today)
+  const [arNo, setArNo] = useState('')
+  const [batchQuantity, setBatchQuantity] = useState('')
+  const [inciName, setInciName] = useState('')
   const [results, setResults] = useState([])
+  const [showConfirm, setShowConfirm] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
 
   function selectProduct(value) {
     const product = products.find((item) => item._id === value)
@@ -980,19 +1028,32 @@ function LabOperatorDashboard({ clients, products, onCreateCoa }) {
   }
 
   const rows = useMemo(
-    () => results.map((row) => ({ ...row, status: statusFor(row.specification, row.result) })),
+    () => results.map((row) => ({ ...row, result: row.result || '' })),
     [results],
   )
 
-  async function submit() {
-    await onCreateCoa({
-      clientId,
-      productId,
-      batchNo,
-      manufacturingDate,
-      expiryDate,
-      results: rows,
-    })
+  const selectedClient = clients.find((c) => c._id === clientId)
+  const selectedProduct = products.find((p) => p._id === productId)
+
+  async function confirmAndSubmit() {
+    setSubmitting(true)
+    try {
+      await onCreateCoa({
+        clientId,
+        productId,
+        batchNo,
+        manufacturingDate,
+        expiryDate,
+        batchReleaseDate,
+        arNo,
+        batchQuantity,
+        inciName,
+        results: rows,
+      })
+    } finally {
+      setSubmitting(false)
+      setShowConfirm(false)
+    }
   }
 
   return (
@@ -1005,7 +1066,7 @@ function LabOperatorDashboard({ clients, products, onCreateCoa }) {
         <span className="connection-pill">Spectrometer Interface: Connected</span>
       </PageHeader>
       <section className="lab-grid">
-        <article className="card config-card">
+        <article className="card config-card batch-config">
           <h3>Batch & Material Details</h3>
           <label>
             Select Client
@@ -1036,11 +1097,34 @@ function LabOperatorDashboard({ clients, products, onCreateCoa }) {
             </label>
             <label>
               Manufacturing Date
-              <input type="date" value={manufacturingDate} onChange={(event) => setManufacturingDate(event.target.value)} />
+              <input
+                type="date"
+                value={manufacturingDate}
+                onChange={(event) => {
+                  setManufacturingDate(event.target.value)
+                  setExpiryDate(addYearsToDateInput(event.target.value, 2))
+                }}
+              />
             </label>
             <label>
-              Expiry Date
+              Retest / Expiry Date
               <input type="date" value={expiryDate} onChange={(event) => setExpiryDate(event.target.value)} />
+            </label>
+            <label>
+              Batch Release Date
+              <input type="date" value={batchReleaseDate} onChange={(event) => setBatchReleaseDate(event.target.value)} />
+            </label>
+            <label>
+              A.R. No.
+              <input value={arNo} onChange={(event) => setArNo(event.target.value)} />
+            </label>
+            <label>
+              Batch Quantity
+              <input value={batchQuantity} onChange={(event) => setBatchQuantity(event.target.value)} />
+            </label>
+            <label>
+              INCI Name
+              <input value={inciName} onChange={(event) => setInciName(event.target.value)} />
             </label>
           </div>
           <div className="secure-note">
@@ -1059,7 +1143,7 @@ function LabOperatorDashboard({ clients, products, onCreateCoa }) {
           ) : (
             <>
               <DataTable
-                columns={['Parameter', 'Specification', 'Result Input', 'Status']}
+                columns={['Parameter', 'Specification', 'Result Input']}
                 rows={rows.map((row, index) => [
                   <>
                     <strong>{row.parameter}</strong>
@@ -1078,12 +1162,11 @@ function LabOperatorDashboard({ clients, products, onCreateCoa }) {
                       }
                     />
                     <span>{row.unit}</span>
-                  </div>,
-                  <span className={`status ${row.status.toLowerCase()}`}>{row.status}</span>,
+                  </div>
                 ])}
               />
               <div className="coa-actions">
-                <button className="primary generate" onClick={submit} disabled={!clientId || !productId || !batchNo}>
+                <button className="primary generate" onClick={() => setShowConfirm(true)} disabled={!clientId || !productId || !batchNo}>
                   <Icon name="file" />
                   Generate COA PDF
                 </button>
@@ -1092,11 +1175,45 @@ function LabOperatorDashboard({ clients, products, onCreateCoa }) {
           )}
         </article>
       </section>
+
+      {showConfirm && (
+        <div className="modal-backdrop" onClick={() => setShowConfirm(false)}>
+          <div className="coa-confirm-card" onClick={(e) => e.stopPropagation()}>
+            <div className="coa-confirm-icon">
+              <Icon name="file" />
+            </div>
+            <h3>Generate Certificate of Analysis?</h3>
+            <p className="coa-confirm-sub">This action will create a permanent COA record.</p>
+            <div className="coa-confirm-grid">
+              <span>Client</span><strong>{selectedClient?.company || '\u2014'}</strong>
+              <span>Product</span><strong>{selectedProduct?.productName || '\u2014'}</strong>
+              <span>Batch No.</span><strong>{batchNo}</strong>
+              <span>Mfg. Date</span><strong>{manufacturingDate || '\u2014'}</strong>
+              <span>Expiry Date</span><strong>{expiryDate || '\u2014'}</strong>
+              <span>Batch Release</span><strong>{batchReleaseDate || '\u2014'}</strong>
+              <span>A.R. No.</span><strong>{arNo || '\u2014'}</strong>
+              <span>Batch Quantity</span><strong>{batchQuantity || '\u2014'}</strong>
+              <span>INCI Name</span><strong>{inciName || ''}</strong>
+              <span>Parameters</span><strong>{rows.length} test items</strong>
+              <span>Results Filled</span>
+              <strong className={rows.filter((r) => r.result).length === rows.length ? 'all-filled' : 'partial-filled'}>
+                {rows.filter((r) => r.result).length} / {rows.length}
+              </strong>
+            </div>
+            <div className="confirm-actions">
+              <button className="secondary" type="button" onClick={() => setShowConfirm(false)}>Cancel</button>
+              <button className="primary" type="button" onClick={confirmAndSubmit} disabled={submitting}>
+                {submitting ? 'Generating\u2026' : 'Confirm & Generate'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }
 
-function CoaArchive({ coas, compact = false, search }) {
+function CoaArchive({ coas, compact = false, search, onDelete }) {
   const [selectedCoa, setSelectedCoa] = useState(null)
 
   const filtered = useMemo(() => {
@@ -1114,9 +1231,17 @@ function CoaArchive({ coas, compact = false, search }) {
       ['COA Number', coa.coaNumber],
       ['Client', coa.clientName],
       ['Product', coa.productName],
+      ['Product Code', coa.productCode || ''],
+      ['Trade Name', coa.tradeName || ''],
       ['Batch', coa.batchNo],
       ['Manufacturing Date', coa.manufacturingDate || ''],
-      ['Expiry Date', coa.expiryDate || ''],
+      ['Retest Date', coa.expiryDate || ''],
+      ['Batch Release Date', coa.batchReleaseDate || ''],
+      ['A.R. No.', coa.arNo || ''],
+      ['Specification No.', coa.specificationNo || ''],
+      ['Batch Quantity', coa.batchQuantity || ''],
+      ['INCI Name', coa.inciName || ''],
+      ['Status', coa.status || ''],
       ['Tested By', coa.testedBy],
       ['Date', new Date(coa.createdAt).toLocaleDateString()],
       [],
@@ -1142,14 +1267,14 @@ function CoaArchive({ coas, compact = false, search }) {
           <EmptyState title="No generated COAs" description="Generate a COA from the lab workspace." />
         ) : (
           <DataTable
-            columns={['COA ID', 'Client', 'Product', 'Batch', 'Generated At', 'Status', 'Actions']}
+            columns={['COA ID', 'Client', 'Product', 'Batch', 'Date of Issue', 'Status', 'Actions']}
             rows={filtered.map((coa) => [
               coa.coaNumber,
               coa.clientName,
               coa.productName,
               coa.batchNo,
               new Date(coa.createdAt).toLocaleString(),
-              <span className="status pass">{coa.status}</span>,
+              <span className={`status ${(coa.status || 'generated').toLowerCase()}`}>{coa.status}</span>,
               <div className="row-actions">
                 <button className="secondary small" type="button" onClick={() => setSelectedCoa(coa)}>
                   View
@@ -1157,6 +1282,11 @@ function CoaArchive({ coas, compact = false, search }) {
                 <button className="secondary small" type="button" onClick={() => exportExcel(coa)}>
                   <Icon name="download" /> CSV
                 </button>
+                {onDelete && (
+                  <button className="secondary small danger" type="button" onClick={() => onDelete(coa._id)}>
+                    Delete
+                  </button>
+                )}
               </div>,
             ])}
           />
@@ -1173,33 +1303,46 @@ function CertificatePreview({ coa, onExportExcel }) {
   function handlePrint() {
     const printEl = document.getElementById('certificate-print')
     if (!printEl) return
-    const w = window.open('', '_blank', 'width=800,height=1000')
-    w.document.write(`<html><head><title>COA ${coa.coaNumber}</title><style>
-      body{font-family:system-ui,sans-serif;padding:40px;color:#152033}
-      table{width:100%;border-collapse:collapse;margin:20px 0}
-      th,td{border:1px solid #d9e2ee;padding:8px 12px;text-align:left}
-      th{background:#f7f9fc;font-size:12px;text-transform:uppercase}
-      h2{text-align:center;letter-spacing:0.15em;text-transform:uppercase}
-      .meta{display:grid;grid-template-columns:1fr 1fr;gap:20px;padding:16px 0;border-top:1px solid #d9e2ee;border-bottom:1px solid #d9e2ee}
-      .hdr{display:flex;justify-content:space-between;padding-bottom:16px;border-bottom:3px solid #152033}
-      footer{display:grid;grid-template-columns:1fr 1fr;gap:30px;margin-top:60px;border-top:1px solid #d9e2ee;padding-top:20px;text-align:center}
-      .note{padding-left:14px;border-left:3px solid #9eb3cc;color:#445875;font-style:italic}
-      @media print{body{padding:20px}}
-    </style></head><body>`)
+    const w = window.open('', '_blank', 'width=900,height=1200')
+    w.document.write(`<html><head><title>COA_${coa.coaNumber}</title><style>
+      @page{size:A4 portrait;margin:12mm 15mm}
+      *{margin:0;padding:0;box-sizing:border-box}
+      html,body{width:100%;height:100%;overflow:hidden}
+      body{font-family:'Times New Roman',Times,serif;padding:0;color:#111;font-size:12.5px;line-height:1.35}
+      .coa-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px}
+      .coa-company{text-align:right}
+      .coa-company strong{font-size:18px;display:block;letter-spacing:0.05em}
+      .coa-company span{font-size:11px;color:#444}
+      h1{text-align:center;font-size:15px;font-weight:bold;text-transform:uppercase;letter-spacing:0.12em;margin:8px 0 14px;text-decoration:underline}
+      .info-grid{width:100%;border-collapse:collapse;margin-bottom:14px}
+      .info-grid td{border:1px solid #333;padding:4px 8px;font-size:11.5px}
+      .info-grid .label{font-weight:bold;width:24%;background:#fafafa}
+      .info-grid .product-name{font-weight:bold;font-size:12px;background:#f5f5f5}
+      .test-table{width:100%;border-collapse:collapse;margin:10px 0}
+      .test-table th,.test-table td{border:1px solid #333;padding:4px 8px;font-size:11.5px;vertical-align:top}
+      .test-table th{font-weight:bold;text-align:center;background:#fafafa}
+      .test-table td:last-child{text-align:center}
+      .cert-statement{margin:12px 0 6px;font-size:11.5px;line-height:1.45}
+      .storage{margin:4px 0 10px;font-size:11.5px}
+      .storage b{font-weight:bold}
+      .digital-note{text-align:center;margin:12px 0;padding:8px;font-size:10.5px;color:#555;}
+      .coa-footer{text-align:center;border-top:1px solid #999;padding-top:8px;margin-top:12px;font-size:10px}
+      .coa-footer strong{display:block;font-size:12px;letter-spacing:0.04em;margin-bottom:2px}
+      .digital-note table {width: 100%;border-collapse: collapse;}
+      .digital-note th,
+      .digital-note td {color: #111;border: 0.5px solid #111;padding: 6px 10px;font-size: 11px;text-align: center;}
+      .sign-cell{height: 60px;}
+      </style></head><body>`)
     w.document.write(printEl.innerHTML)
     w.document.write('</body></html>')
     w.document.close()
     w.onload = () => { w.print(); w.close() }
   }
 
-  function handleDownloadPDF() {
-    handlePrint()
-  }
-
   return (
     <div>
       <div className="coa-action-bar">
-        <button className="primary" type="button" onClick={handleDownloadPDF}>
+        <button className="primary" type="button" onClick={handlePrint}>
           <Icon name="download" /> Download / Print PDF
         </button>
         <button className="secondary" type="button" onClick={handlePrint}>
@@ -1209,62 +1352,110 @@ function CertificatePreview({ coa, onExportExcel }) {
           <Icon name="download" /> Export CSV
         </button>
       </div>
-      <article className="certificate" id="certificate-print">
-        <header>
-          <div className="certificate-brand">
-            <div>
-              <strong>PHARCOS LABORATORIES</strong>
-              <span>Chemical Industries Ltd. | Quality Control Department</span>
-            </div>
-          </div>
-          <div>
-            <span>Document Ref: {coa.coaNumber}</span>
-            <span>Date of Issue: {new Date(coa.createdAt).toLocaleDateString()}</span>
-            <strong>ISO 17025 Certified</strong>
-          </div>
-        </header>
-        <h2>Certificate of Analysis</h2>
-        <div className="certificate-meta">
-          <div>
-            <span>Client Details</span>
-            <strong>{coa.clientName}</strong>
-            <p>Client information is loaded from the client record.</p>
-          </div>
-          <div>
-            <span>Product Details</span>
-            <p><strong>Product:</strong> {coa.productName}</p>
-            <p><strong>Batch:</strong> {coa.batchNo}</p>
-            <p><strong>Manufacturing Date:</strong> {coa.manufacturingDate || 'Not provided'}</p>
-            <p><strong>Expiry Date:</strong> {coa.expiryDate || 'Not provided'}</p>
+      <article className="certificate pharcos-coa" id="certificate-print">
+        <div className="coa-header">
+          <div></div>
+          <div className="coa-company">
+            <strong>PHARCOS</strong>
+            <span>SPECIALITY</span>
           </div>
         </div>
-        <DataTable
-          className="print-table"
-          columns={['Parameter', 'Method', 'Unit', 'Specification', 'Result', 'Status']}
-          rows={(coa.results || []).map((row) => [
-            row.parameter,
-            row.method,
-            row.unit,
-            row.specification,
-            row.result,
-            row.status,
-          ])}
-        />
-        <p className="certificate-note">
-          This certificate is generated digitally from stored client, product, batch, and result records.
+
+        <h1>Certificate of Analysis</h1>
+
+        <table className="info-grid">
+          <tbody>
+            <tr>
+              <td className="product-name" colSpan="4">
+                Product Name: &nbsp;{coa.productName}
+              </td>
+            </tr>
+            <tr>
+              <td className="label">Product Code</td>
+              <td>{coa.productCode || '\u2014'}</td>
+              <td className="label">Batch No.</td>
+              <td>{coa.batchNo}</td>
+            </tr>
+            <tr>
+              <td className="label">Trade Name</td>
+              <td>{coa.tradeName || '\u2014'}</td>
+              <td className="label">INCI Name</td>
+              <td>{coa.inciName || '\u2014'}</td>
+            </tr>
+            <tr>
+              <td className="label">Batch Release Date</td>
+              <td>{formatDate(coa.batchReleaseDate)}</td>
+              <td className="label">Mfg. Date</td>
+              <td>{formatMonthYear(coa.manufacturingDate)}</td>
+            </tr>
+            <tr>
+              <td className="label">A.R. No.</td>
+              <td>{coa.arNo || '\u2014'}</td>
+              <td className="label">Retest Date</td>
+              <td>{formatMonthYear(coa.expiryDate)}</td>
+            </tr>
+            <tr>
+              <td className="label">Specification No.</td>
+              <td>{coa.specificationNo || '\u2014'}</td>
+              <td className="label">Quantity</td>
+              <td>{coa.batchQuantity || '\u2014'}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <table className="test-table">
+          <thead>
+            <tr>
+              <th style={{ width: '30%' }}>Test Items</th>
+              <th style={{ width: '40%' }}>Specifications</th>
+              <th style={{ width: '30%' }}>Results</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(coa.results || []).map((row, i) => (
+              <tr key={i}>
+                <td>{row.parameter}</td>
+                <td>{row.specification}</td>
+                <td>{row.result}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        <p className="cert-statement">
+          We hereby certify that the analysis of <strong>{coa.productName}</strong> confirms
+          to the required specifications and standards. All tests were performed following
+          approved analytical methods.
         </p>
-        <footer>
-          <div className="signature-line">
-            <span>{coa.testedBy}</span>
-            <strong>Analyzed By</strong>
-            <small>Laboratory Analyst</small>
-          </div>
-          <div className="signature-line stamp">
-            <span>Approved QA Release</span>
-            <strong>Approved Signatory</strong>
-            <small>Quality Assurance Director</small>
-          </div>
-        </footer>
+
+        <p className="storage">
+          <b>Storage Condition:</b> Preserve in tight containers. Store as per product specification.
+        </p>
+
+        <div className="digital-note">
+          <table>
+            <tr>
+              <th>Prepared by</th>
+              <th>Checked by</th>
+              <th>Approved by</th>
+            </tr>
+            <tr>
+              <td class="sign-cell"></td>
+              <td class="sign-cell"></td>
+              <td class="sign-cell"></td>
+            </tr>
+            <tr>
+              <td>Officer QC</td>
+              <td>Asst. Manager QC</td>
+              <td>Head QA</td>
+            </tr>
+          </table>
+        </div>
+
+        <div className="coa-footer">
+          <strong>PHARCOS SPECIALITY LTD.</strong>
+          <span>Survey No.168, Plot No. 198 to 207, Dabhel Industrial Co-op. Society Ltd, Village Dabhel, Daman-396 210. (U.T), India.<br /> <b>Web:</b> www.pharcos.co.in | <b>Email</b> info@pharcos.co.in</span>
+        </div>
       </article>
     </div>
   )
@@ -1332,7 +1523,7 @@ function LabOperatorsPage({ users, loading, onSave, onDelete }) {
               <input type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} required />
             </label>
             <label>
-              Password {editingUser && <small style={{fontWeight:400,textTransform:'none',letterSpacing:0}}>(leave blank to keep current)</small>}
+              Password {editingUser && <small style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(leave blank to keep current)</small>}
               <input type="password" value={form.password} onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))} required={!editingUser} />
             </label>
             <label>

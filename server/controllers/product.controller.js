@@ -6,7 +6,7 @@ async function listProducts(req, res) {
 }
 
 async function createProduct(req, res) {
-  const { productName, productCode, grade, description, specifications } = req.body
+  const { productName, productCode, tradeName, grade, specificationNo, description, specifications } = req.body
 
   if (!productName) {
     res.status(400).json({ message: 'Product name is required' })
@@ -16,7 +16,9 @@ async function createProduct(req, res) {
   const product = await Product.create({
     productName,
     productCode: productCode || '',
+    tradeName: tradeName || '',
     grade: grade || '',
+    specificationNo: specificationNo || '',
     description: description || '',
     specifications: Array.isArray(specifications) ? specifications : [],
   })

@@ -12,7 +12,18 @@ async function listCoas(req, res) {
 }
 
 async function createCoa(req, res) {
-  const { clientId, productId, batchNo, manufacturingDate, expiryDate, results } = req.body
+  const {
+    clientId,
+    productId,
+    batchNo,
+    manufacturingDate,
+    expiryDate,
+    batchReleaseDate,
+    arNo,
+    batchQuantity,
+    pageNo,
+    results,
+  } = req.body
   const client = await Client.findById(clientId)
   const product = await Product.findById(productId)
 
@@ -29,9 +40,17 @@ async function createCoa(req, res) {
     clientName: client.company,
     productId,
     productName: product.productName,
+    productCode: product.productCode,
+    tradeName: product.tradeName,
     batchNo,
     manufacturingDate,
     expiryDate,
+    batchReleaseDate,
+    arNo,
+    specificationNo: product.specificationNo,
+    batchQuantity,
+    pageNo,
+    dateOfIssue: new Date().toISOString(),
     results: Array.isArray(results) ? results : [],
     status: 'Generated',
     testedBy: req.user.name,
@@ -42,7 +61,17 @@ async function createCoa(req, res) {
   res.status(201).json(coa)
 }
 
+async function deleteCoa(req, res) {
+  const coa = await Coa.findByIdAndDelete(req.params.id)
+  if (!coa) {
+    res.status(404).json({ message: 'COA not found' })
+    return
+  }
+  res.json({ message: 'COA deleted' })
+}
+
 module.exports = {
   createCoa,
+  deleteCoa,
   listCoas,
 }

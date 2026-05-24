@@ -11,7 +11,7 @@ const config = {
   adminEmail: process.env.ADMIN_EMAIL,
   adminPassword: process.env.ADMIN_PASSWORD,
   labOperatorEmail: process.env.LAB_OPERATOR_EMAIL,
-  labOperatorPassword: process.env.LAB_OPERATOR_PASSWORD,
+  labOperatorPassword: process.env.LAB_OPERATOR_PASSWORD || '',
   skipDatabase: process.env.SKIP_DATABASE === 'true',
 }
 

@@ -10,7 +10,9 @@ const specificationSchema = new mongoose.Schema({
 const productSchema = new mongoose.Schema({
   productName: { type: String, required: true },
   productCode: { type: String, default: '' },
+  tradeName: { type: String, default: '' },
   grade: { type: String, default: '' },
+  specificationNo: { type: String, default: '' },
   description: { type: String, default: '' },
   version: { type: Number, default: 1 },
   specifications: [specificationSchema],
